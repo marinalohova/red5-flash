@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx" minWidth="640" minHeight="480">
+	<fx:Declarations>
+		<s:RadioButtonGroup id="authmode" change="setAuthMode(event)" />
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			
+			import com.hurlant.crypto.Crypto;
+			import com.hurlant.crypto.hash.HMAC;
+			import com.hurlant.crypto.hash.IHash;
+			import com.hurlant.util.Base64;
+			import com.hurlant.util.Hex;
+			
+			import flash.events.*;
+			import flash.media.*;
+			import flash.net.*;
+			import flash.utils.ByteArray;
+			
+			import mx.utils.SHA256;
+								
+			[Bindable]
+			public var nc:NetConnection;
+			[Bindable]
+			public var ns:NetStream;
+			
+			// whether or not you are connected
+			[Bindable]
+			public var connected:Boolean = false;
+					
+			// security / auth vars
+			[Bindable]
+			public var authMode:String = "none";
+			
+			//challenge string
+			[Bindable]
+			public var challenge:String;
+			
+			//session id
+			[Bindable]
+			public var sessionId:String;
+			
+			// response
+			public var response:String;
+			
+			// connect
+			public function connect(evt:Event):void {
+				if (nc != null && nc.connected) {
+					disconnect(evt);
+				} else {
+					//  create the netConnection
+					nc = new NetConnection();
+					nc.objectEncoding = ObjectEncoding.AMF0;
+					//  set it's client/focus to this
+					nc.client = this;
+					log("Client: " + nc.client);
+					nc.proxyType = "best";
+					// add listeners for netstatus and security issues
+					nc.addEventListener(NetStatusEvent.NET_STATUS, nc.client.onStatus);
+					if (authMode === "none") {
+						nc.connect(serverUrl.text, null);
+					} else if (authMode === "red5") {
+						nc.connect(serverUrl.text + "?authmod=red5&user=" + user.text);
+					} else if (authMode === "adobe") {
+						nc.connect(serverUrl.text + "?authmod=adobe&user=" + user.text);
+					}    
+					log("Auth mode: " + authMode);
+				}
+			}
+			
+			public function disconnect(evt:Event):void {
+				if (nc != null && nc.connected) {
+					nc.close();
+				}			
+			}
+			
+			public function setAuthMode(evt:Event):void {
+				if (authmode.selectedValue === "Red5") {
+					authMode = "red5";
+				} else if (authmode.selectedValue === "FMS") {
+					authMode = "fms";
+				} else {
+					authMode = "none";
+				}
+			}
+			
+			public function onStatus(evt:NetStatusEvent):void {
+				log("NetConnection.onStatus: " + evt.info.code);
+				if (evt.info.description !== "undefined") {
+					log("Description: " + evt.info.description);
+				}
+				if (evt.info !== '' || evt.info !== null) { 
+					var desc:String = evt.info.description;
+					switch (evt.info.code) {
+						case "NetConnection.Connect.Success":  
+							log("Connected");   
+							connectBtn.label = "Disconnect";
+							break;
+						case "NetConnection.Connect.Failed":
+							log("Connection failed");
+							break;
+						case "NetConnection.Connect.Rejected":
+							log("Connection rejected");
+							if (desc !== '') {
+								if (desc.indexOf("reason=badauth") > 0) {
+									// auth failed due to user/pass
+									log("Authentication failed for " + user.text + " password: " + passwd.text);
+								} else if (desc.indexOf("code=403") > 0) {
+									// authentication is required
+									var tmp:String = String(evt.info.description);
+									tmp = tmp.slice(tmp.indexOf("authmod") + 8, tmp.indexOf("]") - 1);
+									log("Auth mode needed: '" + tmp + "'");
+								} else {									
+									trace("Got challenge");
+									try {
+										var parameters:Object = {};
+										var params:Array = desc.split('?')[1].split('&');
+										trace("params: " + params);
+										var length:int = params.length;
+										trace("params length: " + length);
+										for (var i:int = 0, index:int = -1;i < length; i++) {
+											var kvPair : String = params[i];
+											if ((index = kvPair.indexOf("=")) > 0) {
+												var key : String = kvPair.substring(0, index);
+												var value : String = kvPair.substring(index + 1);
+												trace("Key: " + key + " Value: " + value);
+												parameters[key] = value;
+											}
+										}    
+										if (parameters["reason"] == "needauth") {  
+											log("Got authentication request");
+											challenge = parameters["challenge"];
+											sessionId = parameters["sessionid"];
+											// send the credentials
+											sendCredentials(null);
+										}
+									} catch(e:Error) {
+										log("Error: " + e.message);
+									}
+								}
+							}
+							break;
+						case "NetConnection.Connect.Closed":   
+							log("Disconnected");
+							connectBtn.label = "Connect";
+							break;
+						case "NetConnection.Connect.CertificateUntrustedSigner":
+							log("Certificate is not trusted");
+							break;
+						case "NetConnection.Connect.CertificatePrincipalMismatch":
+							log("Certificate problem");
+							break;
+						case "NetConnection.Connect.SSLHandshakeFailed":
+							log("SSL handshake failed");
+							break;
+					}           
+				}
+			}			
+			
+			// send authentication data
+			public function sendCredentials(evt:Event):void {
+				log("Credentials - user: " + user.text + " password: " + passwd.text);
+				response = computeHMACSHA256(challenge, passwd.text);
+				log("session: " + sessionId + "\nresponse: " + response);
+				callLater(sendCreds);
+			}
+			
+			private function sendCreds():void {
+				nc.close();
+				nc.connect(serverUrl.text + "?authmod=" + authMode + "&user=" + user.text + "&sessionid=" + sessionId + "&response=" + response);
+			}
+			
+			public static function computeSimpleSHA256(text:String):String {
+				var bytes : ByteArray = new ByteArray();
+				bytes.writeUTFBytes(text);
+				// ByteArray moves the cursor after each read/write, so must reset it!
+				bytes.position = 0;
+				var hash : String = SHA256.computeDigest(bytes);     
+				return hash;
+			}
+			
+			private static function computeSHA256(input:String):String {
+				var hash : IHash = Crypto.getHash("sha256");
+				var data : ByteArray = Hex.toArray(Hex.fromString(input));
+				return Base64.encodeByteArray(hash.hash(data));
+			}
+			
+			private function computeHMACSHA256(key:String, input:String):String {
+				var hmac : HMAC = Crypto.getHMAC("sha256");
+				var kdata : ByteArray = Hex.toArray(Hex.fromString(key));
+				var data : ByteArray = Hex.toArray(Hex.fromString(input));
+				return Base64.encodeByteArray(hmac.compute(kdata, data));
+			}	
+			
+			public function helloAdmin(evt:Event):void {
+				if (nc == null || !nc.connected) {
+					log("Not connected");
+				} else {
+					nc.call("helloAdmin", new Responder(handleResponse));
+				}
+			}
+
+			public function helloUser(evt:Event):void {
+				if (nc == null || !nc.connected) {
+					log("Not connected");
+				} else {
+					nc.call("helloUser", new Responder(handleResponse));
+				}
+			}
+			
+			public function handleResponse(... rest):void {
+				log("Response received: " + rest);
+			}
+			
+			protected function log(text:String):void {
+				messages.appendText(text + "\n");
+				messages.scrollToRange(messages.text.length, messages.text.length);
+			}	
+						
+		]]>
+	</fx:Script>	
+	<s:Label x="10" y="20" fontWeight="bold" text="URL:"/>
+	<s:TextInput id="serverUrl" x="44" y="10" width="240" enabled="true" text="rtmp://localhost/authdemo"/>
+	<s:Button id="connectBtn" x="292" y="10" label="Connect" click="connect(event)"/>
+	<s:Label x="10" y="50" fontWeight="bold" text="Username:"/>
+	<s:TextInput id="user" x="81" y="40" text="admin"/>
+	<s:Label x="11" y="80" fontWeight="bold" text="Password:"/>
+	<s:TextInput id="passwd" x="81" y="70" text="password"/>
+	<s:TextArea id="messages" x="10" y="126" width="678" height="371" editable="false" enabled="true" verticalScrollPolicy="on"/>
+	<s:Label x="10" y="106" fontWeight="bold" text="Authentication Mode:"/>
+	<s:RadioButton x="135" y="100" label="None" group="{authmode}" selected="true"/>
+	<s:RadioButton x="192" y="100" label="Red5" group="{authmode}"/>
+	<s:RadioButton x="249" y="100" label="FMS" group="{authmode}"/>
+	<s:Button x="428" y="71" label="Hello Admin" click="helloAdmin(event)"/>
+	<s:Button x="523" y="71" label="Hello User" click="helloUser(event)"/>
+	<s:Label x="340" y="80" fontWeight="bold" text="Method Tests:"/>
+</s:Application>

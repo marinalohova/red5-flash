@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/halo" 
+			   applicationComplete="init()"
+			   minWidth="320" minHeight="240">
+	<fx:Script>		
+		{			
+			public var hostString:String = 'localhost';
+			
+			private function init():void {
+				Security.allowDomain("*");		
+				var pattern:RegExp = new RegExp("http://([^/]*)/");				
+				if (pattern.test(this.url) == true) {
+					var results:Array = pattern.exec(this.url);
+					hostString = results[1];
+					//need to strip the port to avoid confusion
+					if (hostString.indexOf(":") > 0) {
+						hostString = hostString.split(":")[0];
+					}
+				}		
+			}
+																	
+		}
+	</fx:Script>
+	<s:VideoDisplay id="playerDisplay" x="0" y="0" width="320" height="240"
+					 opaqueBackground="#000000"
+					 source="rtmp://{hostString}/vod/red5.flv"/>
+</s:Application>

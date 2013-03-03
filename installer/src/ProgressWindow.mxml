@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+                layout="absolute"
+                width="388"
+                height="172"
+                title="Installing application">
+
+    <mx:Script>
+        <![CDATA[
+            import mx.controls.Alert;
+            import mx.events.CloseEvent;
+            import mx.managers.PopUpManager;
+
+
+            [Bindable]
+            public var selectedFilename:String
+
+            private function onClickClose(evt:CloseEvent):void {
+                PopUpManager.removePopUp(this)
+            }
+
+            private function onClickOK():void {
+
+            }
+        ]]>
+    </mx:Script>
+
+    <mx:VBox x="5"
+             y="18"
+             height="96"
+             width="100%"
+             verticalGap="10">
+        <mx:Label text="{ 'Installing: ' + selectedFilename }"
+                  fontWeight="bold"/>
+        <mx:ProgressBar height="10"
+                        label=""
+                        indeterminate="true"
+                        labelPlacement="center"
+                        width="340"/>
+        <mx:Label text="This may take a couple minutes, please wait..."
+                  fontWeight="bold"/>
+    </mx:VBox>
+
+
+</mx:TitleWindow>

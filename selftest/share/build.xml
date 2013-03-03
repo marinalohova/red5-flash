@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<project 
+  name="Share Library Builder"
+  default="install">
+  <target name="install">
+    <echo message="Installing share libraries"/>
+  </target>
+
+  <target name="clean">
+    <echo message="Cleaning share libraries"/>
+  </target>
+</project>

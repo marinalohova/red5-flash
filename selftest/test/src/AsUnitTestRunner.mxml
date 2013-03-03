@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FlexRunner 
+    xmlns="asunit.textui.*" 
+    xmlns:mx="http://www.adobe.com/2006/mxml"
+    creationComplete="start(AllTests, null, asunit.textui.TestRunner.SHOW_TRACE);">
+    <mx:Script><![CDATA[
+      /**
+       * This class is the runner for all tests.
+       */
+    ]]>
+    </mx:Script>
+</FlexRunner>

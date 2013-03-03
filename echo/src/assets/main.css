@@ -1,0 +1,46 @@
+Application {
+	background-color: #FFFFFF;
+	theme-color: haloBlue;
+}
+
+.mainPanel {
+	rounded-bottom-corners: true;
+	corner-radius: 5;
+	padding-bottom: 10;
+	padding-top: 10;
+	padding-left: 10;
+	padding-right: 10;
+}
+
+.mainGrid {
+	TestActive: Embed(source = "/assets/test_active.png");
+	TestComplete: Embed(source = "/assets/test_complete.png");
+	TestError: Embed(source = "/assets/test_error.png");
+	TestFailed: Embed(source = "/assets/test_failed.png");
+	TestInit: Embed(source = "/assets/test_init.png");
+	TestTimeout: Embed(source = "/assets/test_timeout.png");
+}
+
+.testActiveIcon {
+	upSkin: Embed(source = "/assets/test_active.png");
+}
+
+.testSuccessIcon {
+	upSkin: Embed(source = "/assets/test_complete.png");
+}
+
+.testErrorIcon {
+	upSkin: Embed(source = "/assets/test_error.png");
+}
+
+.testFailedIcon {
+	upSkin: Embed(source = "/assets/test_failed.png");
+}
+
+.testInitIcon {
+	upSkin: Embed(source = "/assets/test_init.png");
+}
+
+.testTimeoutIcon {
+	upSkin: Embed(source = "/assets/test_timeout.png");
+}

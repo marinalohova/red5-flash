@@ -1,0 +1,21 @@
+<ivy-module version="2.0">
+
+  <info organisation="red5" module="red5-selftest" revision="0.1.1" />
+
+  <configurations>
+    <conf name="default" description="default configuration"/>
+    <conf name="compile" extends="default" description="compiling dependencies"/>
+    <conf name="test" extends="default" description="Unit testing dependencies"/>
+  </configurations>
+  <publications>
+    <artifact name="red5-selftest" type="swf" conf="default" ext="swf"/>
+  </publications>
+  <dependencies defaultconfmapping="*->*">
+    <dependency org="theyard" name="theyard-flashutils" rev="0.1.0" >
+      <artifact name="theyard-flashutils" type="swc" />
+    </dependency>
+    <dependency org="asunit" name="asunit-as3" rev="1.0.204" >
+      <artifact name="asunit-as3" type="swc" />
+    </dependency>
+  </dependencies>
+</ivy-module>

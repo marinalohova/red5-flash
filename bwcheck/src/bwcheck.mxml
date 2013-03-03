@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<app:BandwidthDetectionApp xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:app="org.red5.flash.bwcheck.app.*" layout="absolute" 
+				creationComplete="onAppComplete(event)" width="602" height="250" backgroundColor="#FFFFFF">
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			
+			public function onAppComplete(event:FlexEvent):void
+			{
+					
+			}
+			
+			public function start():void
+			{
+				serverURL = host.text;
+				serverApplication = "bwcheck";
+				clientServerService = "bwCheckService.onClientBWCheck";
+				serverClientService = "bwCheckService.onServerClientBWCheck";
+				connect();
+			}
+		]]>
+	</mx:Script>
+	
+	<mx:TextArea x="0" y="39" width="602" height="211" id="txtLog"/>
+	<mx:Button x="0" y="9" label="Detect Bandwidth" click="start();"/>
+	<mx:TextInput x="174" y="9" width="225" id="host"  text="localhost"/>
+	<mx:Text x="136" y="11" text="Host:" width="40"/>
+	
+	
+</app:BandwidthDetectionApp>

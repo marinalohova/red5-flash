@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    SimplePlayer x4
+    
+    @author Paul Gregoire (mondain@gmail.com)
+-->
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" layout="absolute"
+	applicationComplete="init()" height="660">
+	<mx:Script>
+	<![CDATA[
+	
+		import mx.core.FlexGlobals;
+		
+        [Bindable]
+	    private var backingClass:Main = new Main();
+	    
+        [Bindable]
+		private var clientId:String;
+        
+        public function init() : void {
+            Security.allowDomain("*");
+			            
+            backingClass.setApplication(this);
+            
+            var hostString : String = 'localhost';
+            var pattern : RegExp = new RegExp("http://([^/]*)/");               
+            if (pattern.test(FlexGlobals.topLevelApplication.parameters.url) == true) {
+                var results : Array = pattern.exec(FlexGlobals.topLevelApplication.parameters.url);
+                hostString = results[1];
+                //need to strip the port to avoid confusion
+                if (hostString.indexOf(":") > 0) {
+                    hostString = hostString.split(":")[0];
+                }
+            }
+            log('Host: ' + hostString); 
+            backingClass.server = "rtmp://" + hostString + "/oflaDemo";
+            
+            //add canvas and player display to backing class so they can
+            //be manipulated
+            backingClass.canvas = canvas;
+            backingClass.playerDisplay = playerDisplay;
+            
+        }	   
+	   
+        public function connect() : void {
+            backingClass.connect();
+        }
+        
+        public function callMethod() : void {
+        	backingClass.callMethod(methodName.text, methodParams.text);
+        }
+        
+        public function resize(evt : Event) : void {
+            var originalWidth : Number = backingClass.bmd.width;
+            evt.target.width = originalWidth / 2;
+            var originalHeight : Number = backingClass.bmd.height;
+            evt.target.height = originalHeight / 2;
+            log('Resize to half: ' + originalWidth + 'x' + originalHeight);
+        }
+        
+        public function hide(evt : Event) : void {
+            
+        }   
+        
+        public function seek() : void {
+            log('Seek to: ' + position.text);
+            backingClass.seek(position.text);
+        }
+        
+		public function pause() : void {
+			log('Pause');
+			backingClass.pause();
+		}		
+		
+        public function setAuthMode() : void {
+        	backingClass.setAuthMode(authmode.selectedValue as String);
+        }
+        
+        public function updateTextInput(event : Event) : void {
+        	backingClass[event.target.id] = event.target.text;
+        	//trace("Location: " + backingClass.location);
+        }
+		
+		public function echo(event : Event) : void {
+			backingClass.echo();
+		}
+		
+		public function clearMessages() : void {
+			messages.data = "";
+		}
+        
+        public function log(text : String) : void {
+            var tmp : String;
+            if (messages.data != null) {
+                tmp = String(messages.data);
+            } else {
+                tmp = "";
+            }
+            tmp += text + '\n';
+            messages.data = tmp;
+            messages.verticalScrollPosition = messages.maxVerticalScrollPosition;
+        }
+    
+        public function traceObject(obj : Object, indent : uint = 0) : void {
+            var indentString : String = "";
+            var i : uint;
+            var prop : String;
+            var val : *;
+            for (i = 0;i < indent; i++) {
+                indentString += "\t";
+            }
+            for (prop in obj) {
+                val = obj[prop];
+                if (typeof(val) == "object") {
+                    log(indentString + " " + i + ": [Object]");
+                    traceObject(val, indent + 1);
+                } else {
+                    log(indentString + " " + prop + ": " + val);
+                }
+            }
+        } 
+    ]]>
+    </mx:Script>
+	<mx:Panel x="10" y="10" width="659" height="626" layout="absolute">
+		<mx:Label id="playerDisplay" x="10" y="10" width="320" height="240"/>
+		<mx:Button x="10" y="460" id="connector" label="{backingClass.connectorLabel}" click="connect()"/>
+		<mx:TextInput x="110" y="460" id="server" width="220" text="{backingClass.server}" change="updateTextInput(event)"/>
+		<mx:TextInput x="403" y="460" id="location" width="226" text="{backingClass.location}" change="updateTextInput(event)"/>
+		<mx:TextArea x="338" y="10" width="291" height="377" id="messages" editable="false"/>
+		<mx:Canvas x="10" y="258" width="320" height="183" id="canvas" click="resize(event)" doubleClick="hide(event)" doubleClickEnabled="true"/>
+		<mx:Label x="338" y="462" text="Filename" fontWeight="bold"/>
+		<mx:Label x="10" y="497" text="Method" fontWeight="bold"/>
+		<mx:TextInput x="65" y="493" width="170" id="methodName" text="test"/>
+		<mx:Button x="539" y="493" label="Call" click="callMethod()"/>
+		<mx:TextInput x="300" y="493" width="231" id="methodParams"/>
+		<mx:Label x="243" y="497" text="Params" fontWeight="bold"/>
+		<mx:TextInput x="51" y="524" width="84" id="position" text="1" textAlign="right"/>
+		<mx:Button x="143" y="524" label="Go" click="seek()"/>
+		<mx:Label x="10" y="558" text="Username" fontWeight="bold"/>
+		<mx:TextInput x="75" y="554" id="user" width="120" text="{backingClass.user}" change="updateTextInput(event)"/>
+		<mx:Label x="203" y="558" text="Password" fontWeight="bold"/>
+		<mx:TextInput x="271" y="554" id="passwd" width="110" text="{backingClass.passwd}" change="updateTextInput(event)"/>
+		<mx:Label x="10" y="526" text="Seek" fontWeight="bold"/>
+		<mx:Label x="389" y="558" text="Auth mode" fontWeight="bold"/>
+		<mx:RadioButtonGroup id="authmode" change="setAuthMode()"/>
+		<mx:RadioButton x="465" y="554" label="None" groupName="authmode" selected="true"/>
+		<mx:RadioButton x="520" y="554" label="Red5" groupName="authmode"/>
+		<mx:RadioButton x="582" y="554" label="FMS" groupName="authmode"/>
+		<mx:Button x="243" y="524" label="Pause" click="pause()"/>
+		<mx:TextInput x="582" y="524" width="47" id="fps" text="0" textAlign="right"/>
+		<mx:Label x="551" y="528" text="FPS" fontWeight="bold"/>
+		<mx:Button x="478" y="524" label="Clear" click="clearMessages()"/>
+		<mx:Button x="338" y="395" label="Echo" click="echo(event)"/>
+	</mx:Panel>
+	
+</mx:Application>

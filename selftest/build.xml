@@ -1,0 +1,431 @@
+<?xml version="1.0"?>
+<project 
+  name="red5-selftest"
+  default="install"
+  basedir="."
+  xmlns:ivy="antlib:org.apache.ivy.ant"
+  >
+
+  <!-- This build file requires Apache Ant >= 1.7 -->
+  <condition property="ant-at-least-7">
+  	<antversion atleast="1.7.0"/>
+  </condition>
+
+  <!-- the project name -->
+  <description>${project.title}</description>
+
+  <!-- load environment settings -->
+  <property environment="env"/>
+
+  <!-- dirs -->
+  <property
+    name="build.dir"
+    location="build"/>
+
+  <property
+    name="lib.dir"
+    location="lib"/>
+
+  <property 
+    name="share.dir" 
+    location="share"/>
+
+  <property 
+    name="test.dir" 
+    location="test/src"/>
+
+  <property 
+    name="src.dir" 
+    location="src"/>
+
+  <property
+    name="dist.dir"
+    location="dist" />
+
+  <property 
+    name="test.build.dir" 
+    location="${build.dir}/test/"/>
+
+  <property
+    name="asdoc.output.dir"
+    value="doc/flash/api"/>
+
+  <property name="ivy.lib.dir" value="${build.dir}/lib"/>
+  <property name="ivy.version" value="ivy-2.0.0-beta2" />
+  <property name="ivy.retrieve.pattern" value="${ivy.lib.dir}/[conf]/[artifact].[ext]" />
+
+  <!-- project settings -->
+  <property file="mk/build.properties" />
+
+  <!-- flex SDK settings -->
+  <property file="mk/flex.properties" />
+
+  <!-- OS specific project settings -->
+  <property file="mk/${os.name}.properties" />
+
+  <!-- Set up the Flex Ant Tasks -->
+  <taskdef resource="flexTasks.tasks" classpath="${env.FLEX_HOME}/ant/lib/flexTasks.jar" />
+
+
+  <!-- file sets -->
+  <fileset 
+    id="src.fileset" 
+    dir="${src.dir}"
+    includes="**/*"/>
+
+  <fileset 
+    id="test.fileset" 
+    dir="${test.dir}"
+    includes="**/*"/>
+
+  <target name="init">
+    <mkdir 
+      dir="${build.dir}"/>
+    <mkdir 
+      dir="${test.build.dir}"/>
+    <mkdir 
+      dir="${test.build.dir}/output"/>
+    <mkdir 
+      dir="${dist.dir}"/>
+    <mkdir 
+      dir="${asdoc.output.dir}"/>
+  </target>
+
+  <target name="ivy-init"
+    unless="red5.ivy.initted"
+    description="Initialize Ivy">
+    <!--
+    Ivy tasks and lib directory
+    http://ant.apache.org/ivy
+    http://testearly.com/2007/06/24/ivy-in-42-steps
+
+    In order for this to work, you need to set the right ivy JAR file into
+    the lib directory of your project; all other dependencies are then managed
+    by that jar file.
+    -->
+    <echo message="Initing ivy from lib/${ivy.version}.jar"/>
+    <taskdef uri="antlib:org.apache.ivy.ant" resource="org/apache/ivy/ant/antlib.xml" classpath="lib/${ivy.version}.jar"/>
+
+    <property name="red5.ivy.initted" value="true"/>
+    <echo message="Ivy task loaded"/>
+    <echo message="ivy.settings.name: ${ivy.settings.name}"/>
+    <ivy:settings override="true" file="mk/ivysettings.xml"/>
+  </target>
+
+  <target name="ivy-retrieve"
+    depends="ivy-init"
+    description="Retrieves any dependent libraries if needed">
+    <!-- Ivy configuration -->
+    <condition property="ivy.settings.name" value="default">
+      <not>
+        <isset property="ivy.settings.name"/>
+      </not>
+    </condition>
+    <mkdir dir="${build.dir}/lib"/>
+    <ivy:resolve file="mk/ivy.xml" type="swc" conf="${ivy.settings.name}"/>
+    <ivy:retrieve file="mk/ivy.xml" conf="${ivy.settings.name}"/>
+  </target>
+
+  <target name="ivy-publish"
+    depends="ivy-init"
+    description="Publish any libraries">
+    <!-- Ivy configuration -->
+    <condition property="ivy.settings.name" value="default">
+      <not>
+        <isset property="ivy.settings.name"/>
+      </not>
+    </condition>
+    <mkdir dir="${build.dir}/lib"/>
+    <echo message="ivy.settings.name: ${ivy.settings.name}"/>
+    <ivy:resolve file="mk/ivy.xml" conf="${ivy.settings.name}"/>
+    <ivy:retrieve file="mk/ivy.xml" conf="${ivy.settings.name}"/>
+    <ivy:publish update="true" replacedynamicrev="false" forcedeliver="true" overwrite="true" resolver="publish">
+      <artifacts pattern="${build.dir}/lib/[artifact].[ext]" />
+    </ivy:publish>
+  </target>
+
+  <target name="clean"
+    description="Clean build (except shared artifacts)">
+    <delete 
+      dir="${asdoc.output.dir}" 
+      failOnError="false" 
+      includeEmptyDirs="true" />
+    <delete 
+      dir="${build.dir}" 
+      failOnError="false" 
+      includeEmptyDirs="true" />
+    <delete 
+      dir="${dist.dir}" 
+      failOnError="false" 
+      includeEmptyDirs="true" />
+  </target>
+
+  <target name="clobber"
+    depends="clean, share-clean"
+    description="Clean build (including shared artifacts)">
+  </target>
+
+  <target name="share-clean"
+    description="Clean all shared objects">
+    <ant dir="share" target="clean" inheritAll="false" />
+  </target>
+
+  <target name="share-install"
+    description="Install all shared libraries">
+    <ant dir="share" target="install" inheritAll="false" />
+  </target>
+
+  <target name="compile-flash-library"
+    depends="state"
+    description="Compiles any Flash libraries (.swc) for this build"
+    if="output.swc.name"
+    unless="library.uptodate"
+    >
+    <mkdir dir="${build.dir}/lib/compile"/>
+    <antcall target="ivy-retrieve" inheritAll="true" inheritRefs="true">
+      <param name="ivy.settings.name" value="compile"/>
+    </antcall>
+    <!-- Figure out the classes we'd want to compile -->
+    <pathconvert
+      property="compile.classes"
+      pathsep=" "
+      dirsep="."
+      refid="src.fileset">
+      <map from="${src.dir}/" to=""/> <!-- make relative -->
+      <mapper>
+        <chainedmapper>
+          <!-- And strip off the .as extension -->
+          <globmapper from="*.as" to ="*"/>
+        </chainedmapper>
+      </mapper>
+    </pathconvert>
+    <pathconvert
+      property="compile.test.classes"
+      pathsep=" "
+      dirsep="."
+      refid="test.fileset">
+      <map from="${test.dir}/" to=""/> <!-- make relative -->
+      <mapper>
+        <chainedmapper>
+          <!-- And strip off the .as extension -->
+          <globmapper from="*..as" to ="*"/>
+          <globmapper from="*.as" to ="*"/>
+        </chainedmapper>
+      </mapper>
+    </pathconvert>
+    <compc output="${build.dir}/lib/${output.swc.filename}"
+      fork="true"
+      include-classes="${compile.classes} ${compile.test.classes}"
+      compiler.incremental="${compiler.incremental}"
+      compiler.debug="${compiler.debug}"
+      compiler.keep-generated-actionscript="${compiler.keep-generated-actionscript}"
+      compiler.strict="${compiler.strict}"
+      benchmark="${compiler.benchmark}"
+      >
+      <source-path path-element="${src.dir}" />
+      <source-path path-element="${test.dir}" />
+      <!-- This means these libraries are compiled against, but not linked.
+      That means you'll want to make sure if your library ACTUALLY
+      depends on these at link time for an SWF, that you include any
+      dependent libraries in the Ivy publication of this library.
+      -->
+      <external-library-path dir="build/lib/compile" includes="**/*" append="true" />
+    </compc>
+  </target>
+
+  <target name="compile-flash-app"
+    depends="state"
+    description="Compiles any Flash applications (.swf) for this build"
+    if="output.swf.name"
+    unless="application.uptodate"
+    >
+    <mkdir dir="${build.dir}/lib/compile"/>
+    <antcall target="ivy-retrieve" inheritAll="true" inheritRefs="true">
+      <param name="ivy.settings.name" value="compile"/>
+    </antcall>
+    <mxmlc file="${src.dir}/${output.swf.inputfile}"
+      fork="true"
+      output="${build.dir}/${output.swf.filename}"
+      compiler.incremental="${compiler.incremental}"
+      compiler.debug="${compiler.debug}"
+      compiler.keep-generated-actionscript="${compiler.keep-generated-actionscript}"
+      compiler.strict="${compiler.strict}"
+      benchmark="${compiler.benchmark}"
+      >
+      <source-path path-element="${src.dir}" />
+      <!-- These will be linked in, but only links in elements actually used -->
+      <library-path dir="build/lib/compile" includes="**/*" append="true" />
+    </mxmlc>
+
+  </target>
+
+  <target name="compile-flash-tests"
+    depends="state"
+    description="Compiles any Flash tests (.swf) for this build"
+    if="output.test.swf.name"
+    unless="test.uptodate"
+    >
+    <mkdir dir="${build.dir}/lib/test"/>
+    <antcall target="ivy-retrieve" inheritAll="true" inheritRefs="true">
+      <param name="ivy.settings.name" value="test"/>
+    </antcall>
+    <mxmlc file="${test.dir}/${output.test.swf.inputfile}"
+      fork="true"
+      output="${test.build.dir}/${output.test.swf.filename}"
+      compiler.incremental="${compiler.incremental}"
+      compiler.debug="${compiler.debug}"
+      compiler.keep-generated-actionscript="${compiler.keep-generated-actionscript}"
+      compiler.strict="${compiler.strict}"
+      benchmark="${compiler.benchmark}"
+      >
+      <source-path path-element="${test.dir}" />
+      <source-path path-element="${src.dir}" />
+      <!-- These will be linked in, but only links in elements actually used -->
+      <library-path dir="build/lib/test" includes="**/*" append="true" />
+    </mxmlc>
+  </target>
+
+  <target name="compile"
+    depends="share-install, compile-flash-library, compile-flash-app"
+    description="Compile any libraries and SWF files">
+  </target>
+
+  <target name="compile-tests"
+    depends="share-install, compile-flash-tests"
+    description="Compile any tests">
+  </target>
+
+  <target 
+    name="run-tests"
+    depends="compile-tests"
+    if="output.test.swf.name"
+    description="Run unit tests for this application">
+    <exec dir="${test.build.dir}" executable="${standalone.flash.exec}"
+      failonerror="true">
+      <arg line='${output.test.swf.filename}'/>
+    </exec>
+  </target>
+
+  <target 
+    name="run-tests-unattended"
+    depends="compile-tests"
+    if="output.test.swf.name"
+    description="Run unattended unit tests for this application">
+    <exec dir="${test.build.dir}" executable="${unattended.flash.exec}"
+      failonerror="true">
+      <arg line='${output.test.swf.filename}'/>
+    </exec>
+  </target>
+
+  <target name="dist"
+    depends="compile, compile-tests"
+    unless="dist.available"
+    description="Install all libraries and SWF files">
+    <mkdir dir="${build.dir}/lib/default"/>
+    <copy todir="${build.dir}/lib">
+      <fileset dir="${test.build.dir}"
+        includes="**/*.swf"
+        />
+    </copy>
+    <antcall target="ivy-publish" inheritAll="true" inheritRefs="true">
+      <param name="ivy.settings.name" value="default"/>
+    </antcall>
+  </target>
+
+  <target name="install"
+    depends="dist"
+    description="Install the libraries">
+  </target>
+
+  <target name="state" 
+    description="Show system state informaion"
+    depends="dependency-tests">
+    <condition property="lib.uptodate" value="Yes" else="No">
+        <isset property="library.uptodate"/>
+    </condition>
+    <echo>ant.project.name = ${ant.project.name}</echo>
+    <echo>       FLEX_HOME = ${FLEX_HOME}</echo>
+    <echo>         os.name = ${os.name}</echo>
+    <echo>library.uptodate = ${lib.uptodate}</echo>
+  </target>
+
+  <target name="dependency-tests"
+    description="Determines whether we need to re-run compilers" >
+
+    <available property="dist.available" file="${dist.dir}" />
+
+    <!-- test "library" uptodateness -->
+    <uptodate 
+      property="library.swc.uptodate" 
+      targetfile="${build.dir}/lib/${output.swc.filename}">
+      <srcfiles refid="src.fileset"/> 
+    </uptodate>
+
+    <!-- test "application" uptodateness -->
+    <uptodate 
+      property="application.swf.uptodate" 
+      targetfile="${build.dir}/${output.swf.filename}">
+      <srcfiles refid="src.fileset"/> 
+    </uptodate>
+    <uptodate 
+      property="application.html.uptodate" 
+      targetfile="${output.swf.html}">
+      <srcfiles refid="src.fileset"/> 
+    </uptodate>
+
+    <!-- test "test" uptodateness -->
+    <uptodate 
+      property="test.swf.uptodate" 
+      targetfile="${build.test.dir}/${output.test.swf.filename}">
+      <srcfiles refid="src.fileset"/> 
+      <srcfiles refid="test.fileset"/> 
+    </uptodate>
+
+    <condition property="application.uptodate">
+      <and>
+        <istrue value="${application.swf.uptodate}"/>
+        <istrue value="${application.html.uptodate}"/>
+      </and>
+    </condition>
+
+    <condition property="test.uptodate">
+      <and>
+        <istrue value="${test.swf.uptodate}"/>
+      </and>
+    </condition>
+
+    <condition property="library.uptodate">
+      <and>
+        <istrue value="${library.swc.uptodate}"/>
+      </and>
+    </condition>
+
+  </target>
+
+  <target 
+    name="doc"
+    description="Build documentation">
+    <mkdir 
+      dir="${asdoc.output.dir}"/>
+    <mkdir 
+      dir="${asdoc.output.dir}"/>
+    <mkdir dir="${build.dir}/lib/compile"/>
+    <antcall target="ivy-retrieve" inheritAll="true" inheritRefs="true">
+      <param name="ivy.settings.name" value="compile"/>
+    </antcall>
+    <exec executable="${asdoc.exe}"
+      failonerror="true">
+      <arg line='-source-path "${src.dir}"'/>
+      <arg line='-source-path "${test.dir}"'/>
+      <arg line='-doc-sources ${src.dir} ${test.dir}'/>
+      <arg line='-load-config="${flex.config.xml}"'/>
+      <arg line='-library-path+="${build.dir}/lib/compile"'/>
+      <arg line='-output "${asdoc.output.dir}"'/>
+      <arg line='-templates-path "${asdoc.templates.dir}"'/>
+      <arg line='-left-frameset-width "${asdoc.framewidth}"'/>
+      <arg line='-benchmark'/>
+    </exec>
+    <echo message="Created API documentation at: ${asdoc.output.dir}"/>
+  </target>
+
+</project>
