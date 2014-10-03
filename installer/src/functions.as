@@ -56,7 +56,7 @@ public function init():void {
     connect()
 }
 
-public function onBWDone():void {
+public function onBWDone(...args):void {
 }
 
 public function onBWCheck(... rest):uint {
